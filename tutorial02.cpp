@@ -1,7 +1,7 @@
 // Include standard headers
 #include <stdio.h>
 #include <stdlib.h>
-#include <vector>
+#include <ctime>
 
 // Include GLEW
 #include <GL/glew.h>
@@ -12,24 +12,20 @@ GLFWwindow* window;
 
 // Include GLM
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 using namespace glm;
-
-// Include AntTweakBar
-#include <AntTweakBar.h>
 
 #include <common/shader.hpp>
 #include <math.h>
 using namespace glm;
-using namespace std;
+using namespace std; 
 #include <iostream>
-
-vec3 gPosition1(-1.5f, 0.0f, 0.0f);
 
 float euler(float stepSize, float lastValue, float yprim) {
     return lastValue + stepSize*yprim;
 }
 
-int main( int argc, char **argv )
+int main( void )
 {
 	// Initialise GLFW
 	if( !glfwInit() )
@@ -63,7 +59,7 @@ int main( int argc, char **argv )
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
 	// Dark blue background
-	glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
+	glClearColor(0.8f, 0.9f, 1.0f, 0.0f);
 
 	GLuint VertexArrayID;
 	glGenVertexArrays(1, &VertexArrayID);
@@ -71,16 +67,89 @@ int main( int argc, char **argv )
 
 	// Create and compile our GLSL program from the shaders
 	GLuint programID = LoadShaders( "SimpleVertexShader.vertexshader", "SimpleFragmentShader.fragmentshader" );
-	
-	const int n_ballz = 4;
+
+	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
+
+	// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
+	glm::mat4 Projection = glm::perspective(45.0f, 4.0f / 3.0f, 0.1f, 100.0f);
+	// Camera matrix
+	glm::mat4 View       = glm::lookAt(
+								glm::vec3(0,0,-3), // Camera is at (4,3,-3), in World Space
+								glm::vec3(0,0,0), // and looks at the origin
+								glm::vec3(0,1,0)  // Head is up (set to 0,-1,0 to look upside-down)
+						   );
+	// Model matrix : an identity matrix (model will be at the origin)
+	glm::mat4 Model      = glm::mat4(1.0f);
+	// Our ModelViewProjection : multiplication of our 3 matrices
+	glm::mat4 MVP        = Projection * View * Model; // Remember, matrix multiplication is the other way around
+
+	const int n_ballz = 7;
 	GLfloat ballz[190*n_ballz] = {0.0f};
+	GLfloat colorz[189*n_ballz] = {0.0f};
+	
+	float ballcolors[3*n_ballz]= {0.0f};
+	
+	srand(time(NULL)); 
+	/*cout << (double)(rand() % 100)/100 << endl;
+	*/
+	for(int c=0; c<3*n_ballz; c+=3)
+	{
+		ballcolors[c] = (double)(rand() % 100)/100;
+		ballcolors[c+1] = (double)(rand() % 100)/100;
+		ballcolors[c+2] = (double)(rand() % 100)/100;
+	}
+
+	/*GLfloat ballcolors[] ={
+		1.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 1.0f,
+		1.0f, 0.0f, 1.0f,
+		0.0f, 1.0f, 1.0f,
+		0.5f, 0.2f, 0.8f,
+		1.0f, 1.0f, 1.0f,
+	};*/
+
+	for(int i=0; i<189*n_ballz; i= i+3)
+	{
+		int j = i/189;
+		colorz[i] = ballcolors[j*3];
+		colorz[i+1] = ballcolors[j*3+1];
+		colorz[i+2] = ballcolors[j*3+2];
+	}
+
+	/*
+	int j = 0;
+
+	for(int w = 0; w < n_ballz; w++){
+
+		while(j<189*n_ballz){
+			colorz[w*j] = ballcolors[w];
+			colorz[w*j+1] = ballcolors[w+1]; 
+			colorz[w*j+2] = ballcolors[w+2];
+			j+=3;
+		}
+	}*/
+
+	/*
+	for(int j = 0; j <189; j+=3){
+		colorz[j] = 1.0f;
+	}
+	for(int j = 189; j <2*189; j+=3){
+		colorz[j+1] = 1.0f;
+	}
+	for(int j = 2*(189); j <3*189; j+=3){
+		colorz[j] = 1.0f;
+		colorz[j+2] = 1.0f;
+	}
+	*/
 
 	//wallz
 	float wlength = 1.0f;
 	float wheight = 0.7f;
 	float wwidth = 0.1f;
 
-	static const GLfloat walls[] = {
+	static const GLfloat walls[] = 
+	{
 	  //West wall
 	  -wlength, wheight, 0.0f,
 	  -wlength + wwidth, wheight, 0.0f,
@@ -109,17 +178,76 @@ int main( int argc, char **argv )
 	  wlength - wwidth, wheight, 0.0f,
 	};
 	
+	const float distBetw = 0.1f;
+	GLfloat ropez[6*n_ballz] = {0.0f};
+
+	//If uneven n_ballz
+	if(n_ballz==1){
+		ropez[0] = 0;
+		ropez[1] = 0.1;
+	}
+	
+	else if(n_ballz%2 == 1){
+		for(int k = 0; k<n_ballz; k++) {
+			if (k==0){
+				ropez[k]=0;
+				ropez[k+1] = 0.1;
+			}
+			//Negative
+			else if(k%2 == 1) {
+				ropez[k*6] = -(k+1)*distBetw;
+				ropez[k*6+1] = 0.1; 
+			}
+			//Positive
+			else {
+				ropez[k*6] = -ropez[(k-1)*6];
+				ropez[k*6+1] = 0.1; 
+			}
+		}
+	}
+	//If even n_ballz
+	else{
+		for(int k = 0; k<n_ballz; k++) {
+			//Negative
+			if(k%2 != 1) {
+				ropez[k*6] = (k+1)*distBetw;
+				ropez[k*6+1] = 0.1; 
+			}
+			//Positive
+			else {
+				ropez[k*6] = -ropez[(k-1)*6];
+				ropez[k*6+1] = 0.1; 
+			}
+		}
+	}
+
+
 	GLuint vertexbuffer;
 	glGenBuffers(1, &vertexbuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(walls), walls, GL_STATIC_DRAW);
 
-	GLuint ropebuffer; 
-	GLuint ballzbuffer;
 
+	//vertex buffer for the ball
+	GLuint ballzbuffer; 
+	glGenBuffers(1, &ballzbuffer); 
+	glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer); 
+	glBufferData(GL_ARRAY_BUFFER, sizeof(ballz), ballz, GL_STATIC_DRAW); 
+
+	//color buffer for the ballz
+	GLuint colorbuffer;
+	glGenBuffers(1, &colorbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(colorz), colorz, GL_STATIC_DRAW);
+
+	//vertex buffer for the roopez
+	GLuint ropebuffer; 
+	glGenBuffers(1, &ropebuffer); 
+	glBindBuffer(GL_ARRAY_BUFFER, ropebuffer); 
+	glBufferData(GL_ARRAY_BUFFER, sizeof(ropez), ropez, GL_STATIC_DRAW);
 
 	//Const
-	float pi = 3.14159f, stepSize = 0.005f, g = 9.82f;
+	float pi = 3.14159f, stepSize = 0.01f, g = 9.82f;
 	bool isPressed = false;
 	bool firstCheck = false;
 
@@ -151,99 +279,35 @@ int main( int argc, char **argv )
 	float airconstant[n_ballz] = {0.0f};
 	//Balls
 	for(int l = 0; l<n_ballz; l++){
-		radius[l] = 0.03f;
+		radius[l] = 0.02f;
 		volume[l] = ((4.0f*pi*pow(radius[l],3.0f))/3.0f);
 		area[l] = 4.0f*pi*pow(radius[l],2.0f);
 		density[l] = 11340.0f; 
 		mass[l] = density[l]*volume[l];
 		airconstant[l] = 0.47f;
 		theta[l] = pi/2;
-		velocity[l] = 35.0f;
+		velocity[l] = 1.0f;
 		acceleration[l] = 0.0f;
-		ropeLength[l] = 0.2f;
-	}
-	/* 
-	//Om man vill välja lite values själv :)
-	for(int l = 0; l<n_ballz; l++){
-
-		float degree;
-
-		cout << "Boll: "  << (l+1) << endl;
-		cout << "Radie: ";
-		cin >> radius[l];
-		cout << "Startvinkel i grader: ";
-		cin >> degree;
-		theta[l] = degree*3.14/180;
-		cout << "Vinkelhastighet: ";
-		cin >> velocity[l];
-		cout << "Length (0.05 - 0.2): ";
-		cin >> ropeLength[l];
-		volume[l] = ((4.0f*pi*pow(radius[l],3.0f))/3.0f);
-		area[l] = 4.0f*pi*pow(radius[l],2.0f);
-		density[l] = 11340.0f; 
-		mass[l] = density[l]*volume[l];
-		airconstant[l] = 0.47f;
-		acceleration[l] = 0.0f;
-	}*/
-
-	// Calc ropes
-	const float distBetw = 0.1f;
-	GLfloat ropez[6*n_ballz] = {0.0f};
-
-	//If uneven n_ballz
-	if(n_ballz==1){
-		ropez[0] = 0;
-		ropez[1] = ropeLength[0];
-	}
-	
-	else if(n_ballz%2 == 1){
-		for(int k = 0; k<n_ballz; k++) {
-			if (k==0){
-				ropez[k]=0;
-				ropez[k+1] = ropeLength[k];
-			}
-			//Negative
-			else if(k%2 == 1) {
-				ropez[k*6] = -(k+1)*distBetw;
-				ropez[k*6+1] = ropeLength[k]; 
-			}
-			//Positive
-			else {
-				ropez[k*6] = -ropez[(k-1)*6];
-				ropez[k*6+1] = ropeLength[k]; 
-			}
-		}
-	}
-	//If even n_ballz
-	else{
-		for(int k = 0; k<n_ballz; k++) {
-			//Negative
-			if(k%2 != 1) {
-				ropez[k*6] = (k+1)*distBetw;
-				ropez[k*6+1] = ropeLength[k]; 
-			}
-			//Positive
-			else {
-				ropez[k*6] = -ropez[(k-1)*6];
-				ropez[k*6+1] = ropeLength[k]; 
-			}
-		}
+		ropeLength[l] = 0.1f;
 	}
 
 	// For speed computation
 	double lastTime = glfwGetTime();
 	double lastFrameTime = lastTime;
-	float timeBetween = 0.0f;
+	int nbFrames = 0;
 
 	do{
 		// Measure speed
 		double currentTime = glfwGetTime();
 		float deltaTime = (float)(currentTime - lastFrameTime); 
-		timeBetween += deltaTime;
 		lastFrameTime = currentTime;
-
-		if (timeBetween >= 1/30 ){ // calc each 1/60 sec
-			timeBetween = 0;
+		nbFrames++;
+		
+		if ( currentTime - lastTime >= 0.1 ){ // If last prinf() was more than 1sec ago
+			// printf and reset
+			printf("%f ms/frame\n", 1000.0/double(nbFrames));
+			nbFrames = 0;
+			lastTime += 0.1;
 
 			// Clear the screen
 			glClear( GL_COLOR_BUFFER_BIT );
@@ -251,29 +315,23 @@ int main( int argc, char **argv )
 			// Use our shader
 			glUseProgram(programID);
 
+			glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
 			//If space is pressed; throw ball!
 			if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && isPressed == false) {
 				isPressed = true;
-				for(int r=0; r<sizeof(ropez)/sizeof(*ropez); r++)
-					ropez[r] = 0.0f;
-				
-				glGenBuffers(1, &ropebuffer); 
-				glBindBuffer(GL_ARRAY_BUFFER, ropebuffer); 
-				glBufferData(GL_ARRAY_BUFFER, sizeof(ropez), ropez, GL_STATIC_DRAW);
-
 			}
 			//Pendulum
 			if (isPressed == false) {
 				for(int index = 0; index<n_ballz; index++) 
 				{
 					airres[index] = (0.5f*pow(velocity[index],2.0f)*area[index]*airconstant[index])/mass[index];
-					
+                
 
 					if (velocity[index] < 0) 
 						airres[index] = airres[index]*-1.0f;
 				
 					acceleration[index] = (-g / ropeLength[index])*sin(theta[index]);
-					velocity[index] = euler(stepSize, velocity[index], acceleration[index]) - airres[index];
+					velocity[index] = euler(stepSize, velocity[index], acceleration[index]);
 					theta[index] = euler(stepSize, theta[index], velocity[index]);
 					xPosition[index] = ropeLength[index]*sin(theta[index]);
 					yPosition[index] = ropeLength[index]*(1 - cos(theta[index]));
@@ -317,6 +375,7 @@ int main( int argc, char **argv )
 					if (yVel[index] < 0) 
 						yAirres[index] = -1*yAirres[index];
 				
+					//cout << xVel << endl;
 					xVel[index] = euler(stepSize, xVel[index], xAcc[index]) - xAirres[index];
 					yVel[index] = euler(stepSize, yVel[index], yAcc[index]) - yAirres[index];
 					xPosition[index] = euler(stepSize, xPosition[index], xVel[index]);
@@ -324,124 +383,80 @@ int main( int argc, char **argv )
 
 					//Hit ground (add radius)
 					if (yPosition[index] - radius[index] < -wheight){
-						yVel[index] = -0.5*yVel[index];
+						yVel[index] = -0.8*yVel[index];
 						yPosition[index] = -wheight + radius[index];
-						xVel[index] = xVel[index]*0.5f;
+						xVel[index] = xVel[index]*0.8f;
 					}
 					//Hit the west or east wall (add radius)
 					if (xPosition[index] - radius[index] < -wlength + wwidth) {
-						xVel[index] = -0.5*xVel[index];
+						xVel[index] = -0.8*xVel[index];
 						xPosition[index] = -wlength + wwidth + radius[index];
 					}
 					if (xPosition[index] + radius[index] > wlength - wwidth) {
-						xVel[index] = -0.5*xVel[index];
+						xVel[index] = -0.8*xVel[index];
 						xPosition[index] = wlength - wwidth - radius[index];
 					}
 					ballz[index*3] = xPosition[index]; 
 					ballz[index*3+1] = yPosition[index];
 				}
 
-				
+      
 				//Collision between two bouncing objects      
-				bool collision;
-				do
+				for(int one = 0; one < n_ballz; one++)
 				{
-					collision = false;
-					for(int one = 0; one < n_ballz; one++)
+					for(int two = one+1; two < n_ballz; two++)
 					{
-						for(int two = one+1; two < n_ballz; two++)
+						if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two] )
 						{
-							if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two] )
+							cout << "collision!! "<< endl;
+							xVel[one] = prexVel[one];
+							xVel[two] = prexVel[two]; 
+
+							yVel[one] = preyVel[one];
+							yVel[two] = preyVel[two];
+
+							float angleOne = atan2(yVel[one], xVel[one]);
+							float angleTwo = atan2(yVel[two], xVel[two]);
+
+            
+							float move = 0.0001;
+							while(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two])
 							{
-								cout << "collision!! "<< endl;
-								collision = true;
-								xVel[one] = prexVel[one];
-								xVel[two] = prexVel[two]; 
+								xPosition[one] = xPosition[one] - (move * cos(angleOne));
+								yPosition[one] = yPosition[one] - (move * sin(angleOne));
 
-								yVel[one] = preyVel[one];
-								yVel[two] = preyVel[two];
-
-							
-								xPosition[one] = prexPos[one];
-								xPosition[two] = prexPos[two];
-
-								yPosition[one] = preyPos[one];
-								yPosition[two] = preyPos[two];
-
-								float angleOne = atan2(yVel[one], xVel[one]);
-								float angleTwo = atan2(yVel[two], xVel[two]);
-							
-								float move = 0.001;
-								while(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two])
-								{								
-									float tempXPos[] = {xPosition[one], xPosition[two]}; 
-									float tempYPos[] = {yPosition[one], yPosition[two]}; 
-
-									xPosition[one] = xPosition[one] - (move * cos(angleOne));
-									yPosition[one] = yPosition[one] - (move * sin(angleOne));
-
-									xPosition[two] = xPosition[two] - (move * cos(angleTwo));
-									yPosition[two] = yPosition[two] - (move * sin(angleTwo));
-
-									//Ground
-									if (yPosition[one] - radius[one] < -wheight)
-										yPosition[one] = -wheight + radius[one];
-									if (yPosition[two] - radius[two] < -wheight)
-										yPosition[two] = -wheight + radius[two];
-								
-									//West Wall
-									if (xPosition[one] - radius[one] < -wlength + wwidth)
-										xPosition[one] = -wlength + wwidth + radius[one];
-									if (xPosition[two] - radius[two] < -wlength + wwidth)
-										xPosition[two] = -wlength + wwidth + radius[two];
-									//West Wall
-									if (xPosition[one] + radius[one] > wlength - wwidth)
-										xPosition[one] = wlength - wwidth -radius[one];
-									if (xPosition[two] + radius[two] > wlength - wwidth)
-										xPosition[two] = wlength - wwidth -radius[two];
-
-									if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) > radius[one] + radius[two])
-									{
-										xPosition[one] = tempXPos[0];
-										yPosition[one] = tempYPos[0];
-
-										xPosition[two] = tempXPos[1];
-										yPosition[two] = tempYPos[1];
-										break;
-									}
-
-								}
-
-								vec2 posOne = vec2(xPosition[one], yPosition[one]);
-								vec2 posTwo = vec2(xPosition[two], yPosition[two]);
-								vec2 xPos = posTwo - posOne;
-
-								vec2 x = normalize(xPos);
-								vec2 v1 = vec2(xVel[one], yVel[one]);
-								float x1 = dot(x, v1);
-								vec2 v1x = x*x1; 
-								vec2 v1y = v1 - v1x; 
-
-								x = -x; 
-								vec2 v2 = vec2(xVel[two], yVel[two]);
-								float x2 = dot(x, v2); 
-								vec2 v2x = x*x2; 
-								vec2 v2y = v2 -v2x; 
-
-								float totMass = mass[one]+mass[two];
-
-								vec2 newV1 = (v1x*((mass[one]-mass[two]) /totMass)) + (v2x*(mass[two]/totMass)) + v1y;
-								vec2 newV2 = (v1x*((mass[one] /totMass)) + (v2x*(mass[two]-mass[one])/totMass)) + v2y;
-
-								xVel[one] = newV1[0]*0.8f;
-								xVel[two] = newV1[1]*0.8f;
-
-								yVel[one] = newV2[0]*0.8f;
-								yVel[two] = newV2[1]*0.8f;
+								xPosition[two] = xPosition[two] - (move * cos(angleTwo));
+								yPosition[two] = yPosition[two] - (move * sin(angleTwo));
 							}
+
+							vec2 posOne = vec2(xPosition[one], yPosition[one]);
+							vec2 posTwo = vec2(xPosition[two], yPosition[two]);
+
+							vec2 x = normalize(posTwo - posOne);
+							vec2 v1 = vec2(xVel[one], yVel[one]);
+							float x1 = dot(x, v1);
+							vec2 v1x = x*x1; 
+							vec2 v1y = v1 - v1x; 
+
+							x = -x; 
+							vec2 v2 = vec2(xVel[two], yVel[two]);
+							float x2 = dot(x, v2); 
+							vec2 v2x = x*x2; 
+							vec2 v2y = v2 -v2x; 
+
+							float totMass = mass[one]+mass[two];
+
+							vec2 newV1 = (v1x*((mass[one]-mass[two]) /totMass)) + (v2x*(mass[two]/totMass)) + v1y;
+							vec2 newV2 = (v1x*((mass[one] /totMass)) + (v2x*(mass[two]-mass[one])/totMass)) + v2y;
+
+							xVel[one] = newV1[0];
+							xVel[two] = newV1[1];
+
+							yVel[one] = newV2[0];
+							yVel[two] = newV2[1];
 						}
 					}
-				}while(collision == true);
+				}
 			}
 
 			//draw the two ballz
@@ -450,9 +465,7 @@ int main( int argc, char **argv )
 				float ang = 0.0f;
 				float step = 0.1f; //same decimals for even size of g_vertex_buffer_data[int]
 				float pi2 = 3.1f;
-
-				//cout << index << " x: " << xVel[index]  << " y: " << yPosition[index] << endl;
-      
+			
 				do{
 					ballz[i] = radius[index]*cos(ang) + xPosition[index];
 					i++;
@@ -460,17 +473,19 @@ int main( int argc, char **argv )
 					i += 2;
 					ang += step;
 				} while (ang <= (2 * pi2));
-    
+			
 				ballz[i] = radius[index] + xPosition[index];
 				ballz[i+1] = yPosition[index];
-			} 
-			for(int g = 0; g < n_ballz; g++)
-			{
-				prexPos[g] = xPosition[g];
-				preyPos[g] = yPosition[g];
-				prexVel[g] = xVel[g];
-				preyVel[g] = yVel[g];
 			}
+
+			prexPos[1] = xPosition[1];
+			prexPos[0] = xPosition[0];
+			prexVel[0] = xVel[0];
+			prexVel[1] = xVel[1];
+			preyPos[0] = yPosition[0];
+			preyPos[1] = yPosition[1];
+			preyVel[0] = yVel[0];
+			preyVel[1] = yVel[1];
 
 			glGenBuffers(1, &ballzbuffer); 
 			glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer); 
@@ -483,6 +498,7 @@ int main( int argc, char **argv )
 			glClear(GL_COLOR_BUFFER_BIT);
 
 			glEnableVertexAttribArray(0);
+			glDisableVertexAttribArray(1); 
 			glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 			glVertexAttribPointer(
 									0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
@@ -495,23 +511,7 @@ int main( int argc, char **argv )
 
 			// Draw the triangle !
 			glDrawArrays(GL_TRIANGLES, 0, 3*6); // 3 indices starting at 0 -> 1 triangle
-    
-			//for them baallz
-			glEnableVertexAttribArray(0);
-			glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer);
-			glVertexAttribPointer(
-									0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
-									3,                  // size
-									GL_FLOAT,           // type
-									GL_FALSE,           // normalized?
-									0,                  // stride
-									(void*)0            // array buffer offset
-									);
 
-			// Draw the triangle !
-			for(int w = 0; w < n_ballz; w++)
-				glDrawArrays(GL_TRIANGLE_FAN, w*63, 63); // 3 indices starting at 0 -> 1 triangle
-			
 			//for the rope
 			glEnableVertexAttribArray(0);
 			glBindBuffer(GL_ARRAY_BUFFER, ropebuffer);
@@ -528,6 +528,35 @@ int main( int argc, char **argv )
 			//glVertexPointer(2, GL_FLOAT, 0, ropez);
 			glDrawArrays(GL_LINES, 0, 2*n_ballz);
 
+    
+			//for them baallz
+			glEnableVertexAttribArray(0);
+			glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer);
+			glVertexAttribPointer(
+									0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
+									3,                  // size
+									GL_FLOAT,           // type
+									GL_FALSE,           // normalized?
+									0,                  // stride
+									(void*)0            // array buffer offset
+									);
+			//coloring the balls
+			glEnableVertexAttribArray(1);
+			glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
+			glVertexAttribPointer(
+									1,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
+									3,                  // size
+									GL_FLOAT,           // type
+									GL_FALSE,           // normalized?
+									0,                  // stride
+									(void*)0            // array buffer offset
+									);
+
+			// Draw the triangle !
+			for(int w = 0; w < n_ballz; w++)
+				glDrawArrays(GL_TRIANGLE_FAN, w*63, 63); // 3 indices starting at 0 -> 1 triangle
+			
+		
 			// Swap buffers
 			glfwSwapBuffers(window);
 			glfwPollEvents();
@@ -545,4 +574,3 @@ int main( int argc, char **argv )
 
 	return 0;
 }
-
