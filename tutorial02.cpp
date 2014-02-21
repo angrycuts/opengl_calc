@@ -20,7 +20,7 @@ using namespace glm;
 #include <common/shader.hpp>
 #include <math.h>
 using namespace glm;
-using namespace std; 
+using namespace std;
 #include <iostream>
 
 vec3 gPosition1(-1.5f, 0.0f, 0.0f);
