@@ -1,6 +1,7 @@
 // Include standard headers
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 
 // Include GLEW
 #include <GL/glew.h>
@@ -13,17 +14,22 @@ GLFWwindow* window;
 #include <glm/glm.hpp>
 using namespace glm;
 
+// Include AntTweakBar
+#include <AntTweakBar.h>
+
 #include <common/shader.hpp>
 #include <math.h>
 using namespace glm;
 using namespace std; 
 #include <iostream>
 
+vec3 gPosition1(-1.5f, 0.0f, 0.0f);
+
 float euler(float stepSize, float lastValue, float yprim) {
     return lastValue + stepSize*yprim;
 }
 
-int main( void )
+int main( int argc, char **argv )
 {
 	// Initialise GLFW
 	if( !glfwInit() )
@@ -65,8 +71,8 @@ int main( void )
 
 	// Create and compile our GLSL program from the shaders
 	GLuint programID = LoadShaders( "SimpleVertexShader.vertexshader", "SimpleFragmentShader.fragmentshader" );
-
-	const int n_ballz = 7;
+	
+	const int n_ballz = 4;
 	GLfloat ballz[190*n_ballz] = {0.0f};
 
 	//wallz
@@ -103,70 +109,17 @@ int main( void )
 	  wlength - wwidth, wheight, 0.0f,
 	};
 	
-	const float distBetw = 0.1f;
-	GLfloat ropez[6*n_ballz] = {0.0f};
-
-	//If uneven n_ballz
-	if(n_ballz==1){
-		ropez[0] = 0;
-		ropez[1] = 0.1;
-	}
-	
-	else if(n_ballz%2 == 1){
-		for(int k = 0; k<n_ballz; k++) {
-			if (k==0){
-				ropez[k]=0;
-				ropez[k+1] = 0.1;
-			}
-			//Negative
-			else if(k%2 == 1) {
-				ropez[k*6] = -(k+1)*distBetw;
-				ropez[k*6+1] = 0.1; 
-			}
-			//Positive
-			else {
-				ropez[k*6] = -ropez[(k-1)*6];
-				ropez[k*6+1] = 0.1; 
-			}
-		}
-	}
-	//If even n_ballz
-	else{
-		for(int k = 0; k<n_ballz; k++) {
-			//Negative
-			if(k%2 != 1) {
-				ropez[k*6] = (k+1)*distBetw;
-				ropez[k*6+1] = 0.1; 
-			}
-			//Positive
-			else {
-				ropez[k*6] = -ropez[(k-1)*6];
-				ropez[k*6+1] = 0.1; 
-			}
-		}
-	}
-
-
 	GLuint vertexbuffer;
 	glGenBuffers(1, &vertexbuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(walls), walls, GL_STATIC_DRAW);
 
-
-	//vertex buffer for the ball
-	GLuint ballzbuffer; 
-	glGenBuffers(1, &ballzbuffer); 
-	glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer); 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(ballz), ballz, GL_STATIC_DRAW); 
-
-	//vertex buffer for the roopez
 	GLuint ropebuffer; 
-	glGenBuffers(1, &ropebuffer); 
-	glBindBuffer(GL_ARRAY_BUFFER, ropebuffer); 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(ropez), ropez, GL_STATIC_DRAW);
+	GLuint ballzbuffer;
+
 
 	//Const
-	float pi = 3.14159f, stepSize = 0.01f, g = 9.82f;
+	float pi = 3.14159f, stepSize = 0.005f, g = 9.82f;
 	bool isPressed = false;
 	bool firstCheck = false;
 
@@ -198,35 +151,99 @@ int main( void )
 	float airconstant[n_ballz] = {0.0f};
 	//Balls
 	for(int l = 0; l<n_ballz; l++){
-		radius[l] = 0.02f;
+		radius[l] = 0.03f;
 		volume[l] = ((4.0f*pi*pow(radius[l],3.0f))/3.0f);
 		area[l] = 4.0f*pi*pow(radius[l],2.0f);
 		density[l] = 11340.0f; 
 		mass[l] = density[l]*volume[l];
 		airconstant[l] = 0.47f;
 		theta[l] = pi/2;
-		velocity[l] = 1.0f;
+		velocity[l] = 35.0f;
 		acceleration[l] = 0.0f;
-		ropeLength[l] = 0.1f;
+		ropeLength[l] = 0.2f;
+	}
+	/* 
+	//Om man vill välja lite values själv :)
+	for(int l = 0; l<n_ballz; l++){
+
+		float degree;
+
+		cout << "Boll: "  << (l+1) << endl;
+		cout << "Radie: ";
+		cin >> radius[l];
+		cout << "Startvinkel i grader: ";
+		cin >> degree;
+		theta[l] = degree*3.14/180;
+		cout << "Vinkelhastighet: ";
+		cin >> velocity[l];
+		cout << "Length (0.05 - 0.2): ";
+		cin >> ropeLength[l];
+		volume[l] = ((4.0f*pi*pow(radius[l],3.0f))/3.0f);
+		area[l] = 4.0f*pi*pow(radius[l],2.0f);
+		density[l] = 11340.0f; 
+		mass[l] = density[l]*volume[l];
+		airconstant[l] = 0.47f;
+		acceleration[l] = 0.0f;
+	}*/
+
+	// Calc ropes
+	const float distBetw = 0.1f;
+	GLfloat ropez[6*n_ballz] = {0.0f};
+
+	//If uneven n_ballz
+	if(n_ballz==1){
+		ropez[0] = 0;
+		ropez[1] = ropeLength[0];
+	}
+	
+	else if(n_ballz%2 == 1){
+		for(int k = 0; k<n_ballz; k++) {
+			if (k==0){
+				ropez[k]=0;
+				ropez[k+1] = ropeLength[k];
+			}
+			//Negative
+			else if(k%2 == 1) {
+				ropez[k*6] = -(k+1)*distBetw;
+				ropez[k*6+1] = ropeLength[k]; 
+			}
+			//Positive
+			else {
+				ropez[k*6] = -ropez[(k-1)*6];
+				ropez[k*6+1] = ropeLength[k]; 
+			}
+		}
+	}
+	//If even n_ballz
+	else{
+		for(int k = 0; k<n_ballz; k++) {
+			//Negative
+			if(k%2 != 1) {
+				ropez[k*6] = (k+1)*distBetw;
+				ropez[k*6+1] = ropeLength[k]; 
+			}
+			//Positive
+			else {
+				ropez[k*6] = -ropez[(k-1)*6];
+				ropez[k*6+1] = ropeLength[k]; 
+			}
+		}
 	}
 
 	// For speed computation
 	double lastTime = glfwGetTime();
 	double lastFrameTime = lastTime;
-	int nbFrames = 0;
+	float timeBetween = 0.0f;
 
 	do{
 		// Measure speed
 		double currentTime = glfwGetTime();
 		float deltaTime = (float)(currentTime - lastFrameTime); 
+		timeBetween += deltaTime;
 		lastFrameTime = currentTime;
-		nbFrames++;
-		
-		if ( currentTime - lastTime >= 0.1 ){ // If last prinf() was more than 1sec ago
-			// printf and reset
-			printf("%f ms/frame\n", 1000.0/double(nbFrames));
-			nbFrames = 0;
-			lastTime += 0.1;
+
+		if (timeBetween >= 1/30 ){ // calc each 1/60 sec
+			timeBetween = 0;
 
 			// Clear the screen
 			glClear( GL_COLOR_BUFFER_BIT );
@@ -237,19 +254,26 @@ int main( void )
 			//If space is pressed; throw ball!
 			if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && isPressed == false) {
 				isPressed = true;
+				for(int r=0; r<sizeof(ropez)/sizeof(*ropez); r++)
+					ropez[r] = 0.0f;
+				
+				glGenBuffers(1, &ropebuffer); 
+				glBindBuffer(GL_ARRAY_BUFFER, ropebuffer); 
+				glBufferData(GL_ARRAY_BUFFER, sizeof(ropez), ropez, GL_STATIC_DRAW);
+
 			}
 			//Pendulum
 			if (isPressed == false) {
 				for(int index = 0; index<n_ballz; index++) 
 				{
 					airres[index] = (0.5f*pow(velocity[index],2.0f)*area[index]*airconstant[index])/mass[index];
-                
+					
 
 					if (velocity[index] < 0) 
 						airres[index] = airres[index]*-1.0f;
 				
 					acceleration[index] = (-g / ropeLength[index])*sin(theta[index]);
-					velocity[index] = euler(stepSize, velocity[index], acceleration[index]);
+					velocity[index] = euler(stepSize, velocity[index], acceleration[index]) - airres[index];
 					theta[index] = euler(stepSize, theta[index], velocity[index]);
 					xPosition[index] = ropeLength[index]*sin(theta[index]);
 					yPosition[index] = ropeLength[index]*(1 - cos(theta[index]));
@@ -293,7 +317,6 @@ int main( void )
 					if (yVel[index] < 0) 
 						yAirres[index] = -1*yAirres[index];
 				
-					//cout << xVel << endl;
 					xVel[index] = euler(stepSize, xVel[index], xAcc[index]) - xAirres[index];
 					yVel[index] = euler(stepSize, yVel[index], yAcc[index]) - yAirres[index];
 					xPosition[index] = euler(stepSize, xPosition[index], xVel[index]);
@@ -301,80 +324,124 @@ int main( void )
 
 					//Hit ground (add radius)
 					if (yPosition[index] - radius[index] < -wheight){
-						yVel[index] = -0.8*yVel[index];
+						yVel[index] = -0.5*yVel[index];
 						yPosition[index] = -wheight + radius[index];
-						xVel[index] = xVel[index]*0.8f;
+						xVel[index] = xVel[index]*0.5f;
 					}
 					//Hit the west or east wall (add radius)
 					if (xPosition[index] - radius[index] < -wlength + wwidth) {
-						xVel[index] = -0.8*xVel[index];
+						xVel[index] = -0.5*xVel[index];
 						xPosition[index] = -wlength + wwidth + radius[index];
 					}
 					if (xPosition[index] + radius[index] > wlength - wwidth) {
-						xVel[index] = -0.8*xVel[index];
+						xVel[index] = -0.5*xVel[index];
 						xPosition[index] = wlength - wwidth - radius[index];
 					}
 					ballz[index*3] = xPosition[index]; 
 					ballz[index*3+1] = yPosition[index];
 				}
 
-      
+				
 				//Collision between two bouncing objects      
-				for(int one = 0; one < n_ballz; one++)
+				bool collision;
+				do
 				{
-					for(int two = one+1; two < n_ballz; two++)
+					collision = false;
+					for(int one = 0; one < n_ballz; one++)
 					{
-						if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two] )
+						for(int two = one+1; two < n_ballz; two++)
 						{
-							cout << "collision!! "<< endl;
-							xVel[one] = prexVel[one];
-							xVel[two] = prexVel[two]; 
-
-							yVel[one] = preyVel[one];
-							yVel[two] = preyVel[two];
-
-							float angleOne = atan2(yVel[one], xVel[one]);
-							float angleTwo = atan2(yVel[two], xVel[two]);
-
-            
-							float move = 0.0001;
-							while(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two])
+							if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two] )
 							{
-								xPosition[one] = xPosition[one] - (move * cos(angleOne));
-								yPosition[one] = yPosition[one] - (move * sin(angleOne));
+								cout << "collision!! "<< endl;
+								collision = true;
+								xVel[one] = prexVel[one];
+								xVel[two] = prexVel[two]; 
 
-								xPosition[two] = xPosition[two] - (move * cos(angleTwo));
-								yPosition[two] = yPosition[two] - (move * sin(angleTwo));
+								yVel[one] = preyVel[one];
+								yVel[two] = preyVel[two];
+
+							
+								xPosition[one] = prexPos[one];
+								xPosition[two] = prexPos[two];
+
+								yPosition[one] = preyPos[one];
+								yPosition[two] = preyPos[two];
+
+								float angleOne = atan2(yVel[one], xVel[one]);
+								float angleTwo = atan2(yVel[two], xVel[two]);
+							
+								float move = 0.001;
+								while(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two])
+								{								
+									float tempXPos[] = {xPosition[one], xPosition[two]}; 
+									float tempYPos[] = {yPosition[one], yPosition[two]}; 
+
+									xPosition[one] = xPosition[one] - (move * cos(angleOne));
+									yPosition[one] = yPosition[one] - (move * sin(angleOne));
+
+									xPosition[two] = xPosition[two] - (move * cos(angleTwo));
+									yPosition[two] = yPosition[two] - (move * sin(angleTwo));
+
+									//Ground
+									if (yPosition[one] - radius[one] < -wheight)
+										yPosition[one] = -wheight + radius[one];
+									if (yPosition[two] - radius[two] < -wheight)
+										yPosition[two] = -wheight + radius[two];
+								
+									//West Wall
+									if (xPosition[one] - radius[one] < -wlength + wwidth)
+										xPosition[one] = -wlength + wwidth + radius[one];
+									if (xPosition[two] - radius[two] < -wlength + wwidth)
+										xPosition[two] = -wlength + wwidth + radius[two];
+									//West Wall
+									if (xPosition[one] + radius[one] > wlength - wwidth)
+										xPosition[one] = wlength - wwidth -radius[one];
+									if (xPosition[two] + radius[two] > wlength - wwidth)
+										xPosition[two] = wlength - wwidth -radius[two];
+
+									if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) > radius[one] + radius[two])
+									{
+										xPosition[one] = tempXPos[0];
+										yPosition[one] = tempYPos[0];
+
+										xPosition[two] = tempXPos[1];
+										yPosition[two] = tempYPos[1];
+										break;
+									}
+
+								}
+
+								vec2 posOne = vec2(xPosition[one], yPosition[one]);
+								vec2 posTwo = vec2(xPosition[two], yPosition[two]);
+								vec2 xPos = posTwo - posOne;
+
+								vec2 x = normalize(xPos);
+								vec2 v1 = vec2(xVel[one], yVel[one]);
+								float x1 = dot(x, v1);
+								vec2 v1x = x*x1; 
+								vec2 v1y = v1 - v1x; 
+
+								x = -x; 
+								vec2 v2 = vec2(xVel[two], yVel[two]);
+								float x2 = dot(x, v2); 
+								vec2 v2x = x*x2; 
+								vec2 v2y = v2 -v2x; 
+
+								float totMass = mass[one]+mass[two];
+
+								vec2 newV1 = (v1x*((mass[one]-mass[two]) /totMass)) + (v2x*(mass[two]/totMass)) + v1y;
+								vec2 newV2 = (v1x*((mass[one] /totMass)) + (v2x*(mass[two]-mass[one])/totMass)) + v2y;
+
+								xVel[one] = newV1[0]*0.8f;
+								xVel[two] = newV1[1]*0.8f;
+
+								yVel[one] = newV2[0]*0.8f;
+								yVel[two] = newV2[1]*0.8f;
 							}
-
-							vec2 posOne = vec2(xPosition[one], yPosition[one]);
-							vec2 posTwo = vec2(xPosition[two], yPosition[two]);
-
-							vec2 x = normalize(posTwo - posOne);
-							vec2 v1 = vec2(xVel[one], yVel[one]);
-							float x1 = dot(x, v1);
-							vec2 v1x = x*x1; 
-							vec2 v1y = v1 - v1x; 
-
-							x = -x; 
-							vec2 v2 = vec2(xVel[two], yVel[two]);
-							float x2 = dot(x, v2); 
-							vec2 v2x = x*x2; 
-							vec2 v2y = v2 -v2x; 
-
-							float totMass = mass[one]+mass[two];
-
-							vec2 newV1 = (v1x*((mass[one]-mass[two]) /totMass)) + (v2x*(mass[two]/totMass)) + v1y;
-							vec2 newV2 = (v1x*((mass[one] /totMass)) + (v2x*(mass[two]-mass[one])/totMass)) + v2y;
-
-							xVel[one] = newV1[0];
-							xVel[two] = newV1[1];
-
-							yVel[one] = newV2[0];
-							yVel[two] = newV2[1];
 						}
 					}
-				}
+				}while(collision == true);
 			}
 
 			//draw the two ballz
@@ -383,6 +450,8 @@ int main( void )
 				float ang = 0.0f;
 				float step = 0.1f; //same decimals for even size of g_vertex_buffer_data[int]
 				float pi2 = 3.1f;
+
+				//cout << index << " x: " << xVel[index]  << " y: " << yPosition[index] << endl;
       
 				do{
 					ballz[i] = radius[index]*cos(ang) + xPosition[index];
@@ -395,14 +464,13 @@ int main( void )
 				ballz[i] = radius[index] + xPosition[index];
 				ballz[i+1] = yPosition[index];
 			} 
-			prexPos[1] = xPosition[1];
-			prexPos[0] = xPosition[0];
-			prexVel[0] = xVel[0];
-			prexVel[1] = xVel[1];
-			preyPos[0] = yPosition[0];
-			preyPos[1] = yPosition[1];
-			preyVel[0] = yVel[0];
-			preyVel[1] = yVel[1];
+			for(int g = 0; g < n_ballz; g++)
+			{
+				prexPos[g] = xPosition[g];
+				preyPos[g] = yPosition[g];
+				prexVel[g] = xVel[g];
+				preyVel[g] = yVel[g];
+			}
 
 			glGenBuffers(1, &ballzbuffer); 
 			glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer); 
@@ -442,7 +510,7 @@ int main( void )
 
 			// Draw the triangle !
 			for(int w = 0; w < n_ballz; w++)
-				glDrawArrays(GL_LINES, w*(31*2 +1), (w+1)*(31*2)-1); // 3 indices starting at 0 -> 1 triangle
+				glDrawArrays(GL_TRIANGLE_FAN, w*63, 63); // 3 indices starting at 0 -> 1 triangle
 			
 			//for the rope
 			glEnableVertexAttribArray(0);
