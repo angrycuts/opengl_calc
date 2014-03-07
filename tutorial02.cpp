@@ -24,12 +24,13 @@ using namespace glm;
 using namespace std; 
 #include <iostream>
 
+//numerical integration method: euler
 float euler(float stepSize, float lastValue, float yprim) {
     return lastValue + stepSize*yprim;
 }
 int main( int argc, char **argv )
 {
-	// Initialise GLFW
+	// Initialise GLFW, with errormsg
 	if( !glfwInit() )
 	{
 		fprintf( stderr, "Failed to initialize GLFW\n" );
@@ -60,7 +61,7 @@ int main( int argc, char **argv )
 	// Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
-	// Dark blue background
+	//background colour
 	glClearColor(0.8f, 0.9f, 1.0f, 0.0f);
 
 	GLuint VertexArrayID;
@@ -92,7 +93,7 @@ int main( int argc, char **argv )
 	
 	// Initialize color of the balls
 	GLfloat colorz[189*n_ballz] = {0.0f};
-	float ballcolors[3*n_ballz]= {0.0f};
+	float ballcolors[3*n_ballz]= {0.0f}; //each ball get an own color (r,g,b)
 	GLuint colorBallBuffer; 
 	srand(time(NULL));
 
@@ -103,6 +104,7 @@ int main( int argc, char **argv )
 		ballcolors[c+1] = (double)(rand() % 100)/100;
 		ballcolors[c+2] = (double)(rand() % 100)/100;
 	}
+	//apply the color each ball
 	for(int i=0; i<189*n_ballz; i= i+3)
 	{
 		int j = i/189;
@@ -115,7 +117,7 @@ int main( int argc, char **argv )
 	//Set how big the walls should be
 	float wlength = 2.0f;
 	float wheight = 0.7f;
-	float wwidth = 0.1f;
+	float wwidth = 0.1f; //of the walls and floor
 
 	static const GLfloat walls[] = {
 	  //West wall
@@ -160,12 +162,13 @@ int main( int argc, char **argv )
 	bool isPressed = false;
 	bool firstCheck = false;
 
-	//Initialvalues
+	//Allocate arrays for the objects' properties
 	float theta[n_ballz];
 	float velocity[n_ballz];
 	float acceleration[n_ballz];
 	float ropeLength[n_ballz];
 
+	//initialize them
 	float xAcc[n_ballz] = {0.0f};
 	float yAcc[n_ballz] = {0.0f};
 	float xVel[n_ballz] = {0.0f};
@@ -186,7 +189,8 @@ int main( int argc, char **argv )
 	float density[n_ballz] = {0.0f}; 
 	float mass[n_ballz] = {0.0f};
 	float airconstant[n_ballz] = {0.0f};
-	//Balls
+
+	//Initialize for non-zero values
 	for(int l = 0; l<n_ballz; l++){
 		radius[l] = 0.05f;
 		volume[l] = ((4.0f*pi*pow(radius[l],3.0f))/3.0f);
@@ -227,15 +231,16 @@ int main( int argc, char **argv )
 	/***********************************************************/
 	// Calc how the balls(ropes) should appear in the simulation
 	/***********************************************************/
-	const float distBetw = 0.1f;
+	const float distBetw = 0.1f; //between two penduluma
 	GLfloat ropez[6*n_ballz] = {0.0f};
 
-	// If it's one ball
+	//to draw the pendulums within nice intervals and distance to eachother and the walls
+	// If it is only one ball
 	if(n_ballz==1){
 		ropez[0] = 0;
 		ropez[1] = ropeLength[0];
 	}
-	//If uneven n_ballz
+	//If uneven number of balls
 	else if(n_ballz%2 == 1){
 		for(int k = 0; k<n_ballz; k++) {
 			if (k==0){
@@ -254,7 +259,7 @@ int main( int argc, char **argv )
 			}
 		}
 	}
-	//If even n_ballz
+	//If even number of balls
 	else{
 		for(int k = 0; k<n_ballz; k++) {
 			//Negative
@@ -270,9 +275,7 @@ int main( int argc, char **argv )
 		}
 	}
 
-	// For speed computation
-	glfwSwapInterval(1);
-
+	//the render loop!
 	do{
 
 		// Clear the screen
@@ -285,24 +288,25 @@ int main( int argc, char **argv )
 		// in the "MVP" uniform
 		glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
 
-		//If space is pressed; throw ball!
+		//If space abar is pressed; throw ball!
 		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && isPressed == false) {
 			isPressed = true;
+			//the ropes should be erased and their buffer binded
 			for(int r=0; r<sizeof(ropez)/sizeof(*ropez); r++)
 				ropez[r] = 0.0f;
-				
+			
 			glGenBuffers(1, &ropebuffer); 
 			glBindBuffer(GL_ARRAY_BUFFER, ropebuffer); 
 			glBufferData(GL_ARRAY_BUFFER, sizeof(ropez), ropez, GL_STATIC_DRAW);
 
 		}
-		//Pendulum
+		//if the space bar is not pressed - the balls should be drawn as pendulums
 		if (isPressed == false) {
 			for(int index = 0; index<n_ballz; index++) 
 			{
 				airres[index] = (0.5f*pow(velocity[index],2.0f)*area[index]*airconstant[index])/mass[index];
 					
-
+				//the air resistant is always opposite to the velocity
 				if (velocity[index] < 0) 
 					airres[index] = airres[index]*-1.0f;
 				
@@ -324,6 +328,7 @@ int main( int argc, char **argv )
 				float k4theta = velocity[index]+stepSize*k2w;
 				float k4w = (-g/ropeLength[index])*sin(theta[index]+k2theta*stepSize);
 
+				//get acceleration, velocity and position for all balls
 				acceleration[index] = -(g/ropeLength[index]*sin(theta[index]));
 				velocity[index] = velocity[index]+(stepSize*(k1w + 2*k2w + 2*k3w + k4w)/6)-airres[index];
 				theta[index] = theta[index]+(stepSize*(k1theta + 2*k2theta + 2*k3theta + k4theta)/6);
@@ -332,17 +337,18 @@ int main( int argc, char **argv )
 				yPosition[index] = ropeLength[index]*(1 - cos(theta[index]));
 
 				xPosition[index] += ropez[index*6];
-
+				//change the position of the rope according to its balls xposition
 				ropez[index*6 + 3] = xPosition[index];
 				ropez[index*6 + 4] = yPosition[index];
 
+				//bind the buffers
 				glGenBuffers(1, &ropebuffer); 
 				glBindBuffer(GL_ARRAY_BUFFER, ropebuffer); 
 				glBufferData(GL_ARRAY_BUFFER, sizeof(ropez), ropez, GL_STATIC_DRAW);
 			}
 		}
     
-		//Projectile
+		//If the space bar is pressed: Projectile movement
 		else {
 			if (firstCheck == false){
 				for(int index = 0; index<n_ballz; index++) {
@@ -350,6 +356,8 @@ int main( int argc, char **argv )
 					yAcc[index] = acceleration[index] * sin(theta[index]) - g; 
 					xVel[index] = velocity[index] * cos(theta[index]);
 					yVel[index] = velocity[index] * sin(theta[index]);
+
+					//in order to erase the ropes -> zero values. 
 					ropez[index*6 +1] = 0.0f;
 					ropez[index*6 +3] = 0.0f;
 					ropez[index*6 +4] = 0.0f;
@@ -401,21 +409,25 @@ int main( int argc, char **argv )
 				yVel[index] = yVel[index] + (stepSize*(k1yVel + 2*k2yVel + 2*k3yVel + k4yVel)/6);
 				xVel[index] = xVel[index] + (stepSize*(k1xVel + 2*k2xVel + 2*k3xVel + k4xVel)/6);
 
-				//Hit ground (add radius)
-				if (yPosition[index] - radius[index] < -wheight){
-					yVel[index] = -0.5*yVel[index];
-					yPosition[index] = -wheight + radius[index];
-					xVel[index] = xVel[index]*0.5f;
+				//collision detection!
+				//1. check the distance to the ground 
+				if (yPosition[index] - radius[index] < -wheight){ 	//if the edge of the circle is below the ground, 
+					yVel[index] = -0.5*yVel[index];					//change the direction of the velocity and damp with x0.5
+					xVel[index] = 0.5f*xVel[index];
+					yPosition[index] = -wheight + radius[index];	//set the x-pos of the ball to lie on top of the floor
+					
 				}
-				//Hit the west or east wall (add radius)
-				if (xPosition[index] - radius[index] < -wlength + wwidth) {
-					xVel[index] = -0.5*xVel[index];
-					xPosition[index] = -wlength + wwidth + radius[index];
+				//2. Hit the west wall
+				if (xPosition[index] - radius[index] < -wlength + wwidth) {	
+					xVel[index] = -0.5*xVel[index];							//change direction of the x-velocity and damp with a factor of 0.5
+					xPosition[index] = -wlength + wwidth + radius[index];	//set the x-position of the ball to lie adjacent to the west wall
 				}
-				if (xPosition[index] + radius[index] > wlength - wwidth) {
-					xVel[index] = -0.5*xVel[index];
-					xPosition[index] = wlength - wwidth - radius[index];
+				//3. Hit the east wall
+				if (xPosition[index] + radius[index] > wlength - wwidth) {	
+					xVel[index] = -0.5*xVel[index];							//change direction of the x-velocity and damp with a factor of 0.5
+					xPosition[index] = wlength - wwidth - radius[index];	//set the x-position of the ball to lie adjacent to the east wall
 				}
+				//set the values for the ball!
 				ballz[index*3] = xPosition[index]; 
 				ballz[index*3+1] = yPosition[index];
 			}
@@ -424,14 +436,17 @@ int main( int argc, char **argv )
 			bool collision;
 			do
 			{
-				//Keep going
+				//Keep going 
 				collision = false;
-				for(int one = 0; one < n_ballz; one++)
+				for(int one = 0; one < n_ballz; one++) //check collision between two balls. 
 				{
 					for(int two = one+1; two < n_ballz; two++)
 					{
+						//if the distance(hypotenuse) between the balls are smaller than the sum of their radius
+						//they have stuck together -> fix so that they are two separate objects
 						if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two] )
-						{
+						{	
+							//save the previous values of the balls
 							collision = true;
 							xVel[one] = prexVel[one];
 							xVel[two] = prexVel[two]; 
@@ -449,6 +464,7 @@ int main( int argc, char **argv )
 							float angleOne = atan2(yVel[one], xVel[one]);
 							float angleTwo = atan2(yVel[two], xVel[two]);
 							
+							//move the ball from the previous values: along the normal plane until they are adjacents
 							float move = 0.001;
 							while(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two])
 							{			
@@ -462,7 +478,7 @@ int main( int argc, char **argv )
 								xPosition[two] = xPosition[two] - (move * cos(angleTwo));
 								yPosition[two] = yPosition[two] - (move * sin(angleTwo));*/	
 
-								
+								//calc
 								vec2 posOne = vec2(xPosition[one], yPosition[one]);
 								vec2 posTwo = vec2(xPosition[two], yPosition[two]);
 								vec2 norm = posOne - posTwo;
