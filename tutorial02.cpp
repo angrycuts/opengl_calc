@@ -464,21 +464,22 @@ int main( int argc, char **argv )
 							float angleOne = atan2(yVel[one], xVel[one]);
 							float angleTwo = atan2(yVel[two], xVel[two]);
 							
-							//move the ball from the previous values: along the normal plane until they are adjacents
+							
 							float move = 0.001;
 
-							//calc
+							//calculate the normalplane
 							vec2 posOne = vec2(xPosition[one], yPosition[one]);
 							vec2 posTwo = vec2(xPosition[two], yPosition[two]);
 							vec2 norm = posOne - posTwo;
 							vec2 normalPlane = normalize(norm);
-
+							//move the ball from the previous values: along the normal plane until they are adjacents
 							while(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two])
 							{			
 									
 								float tempXPos[] = {xPosition[one], xPosition[two]}; 
 								float tempYPos[] = {yPosition[one], yPosition[two]}; 
-								
+
+								//move towards each other: in the right direction
 								if(xPosition[one] < xPosition[two]){
 									posOne -= move*normalPlane;
 									posTwo += move*normalPlane;
@@ -488,23 +489,24 @@ int main( int argc, char **argv )
 									posTwo -= move*normalPlane;
 								}
 
-								//Ground
+								//Check for collision with the ground
 								if (yPosition[one] - radius[one] < -wheight)
 									yPosition[one] = -wheight + radius[one];
 								if (yPosition[two] - radius[two] < -wheight)
 									yPosition[two] = -wheight + radius[two];
 								
-								//West Wall
+								//Check for collision with the west wall
 								if (xPosition[one] - radius[one] < -wlength + wwidth)
 									xPosition[one] = -wlength + wwidth + radius[one];
 								if (xPosition[two] - radius[two] < -wlength + wwidth)
 									xPosition[two] = -wlength + wwidth + radius[two];
-								//West Wall
+								//Check for collision with the east wall
 								if (xPosition[one] + radius[one] > wlength - wwidth)
 									xPosition[one] = wlength - wwidth -radius[one];
 								if (xPosition[two] + radius[two] > wlength - wwidth)
 									xPosition[two] = wlength - wwidth -radius[two];
 
+								//if the distance between the balls are larger than the sum of their radius
 								if(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) > radius[one] + radius[two])
 								{
 									xPosition[one] = tempXPos[0];
@@ -516,12 +518,15 @@ int main( int argc, char **argv )
 								}
 
 							}
-								
+							//the collision can now be calculated since the distance between them is ok
+
+							//initialize some parameters	
 							float totMass = mass[one]+mass[two];
 							posOne = vec2(xPosition[one], yPosition[one]);
 							posTwo = vec2(xPosition[two], yPosition[two]);
 							norm = posOne - posTwo;
 
+							//calculate both normal plane and the collision plane
 							normalPlane = normalize(norm);
 							vec2 collisionPlane = vec2(-normalPlane[1], normalPlane[0]);
 
@@ -533,13 +538,13 @@ int main( int argc, char **argv )
 							float n_vel2 = dot(normalPlane, v2);
 							float c_vel2 = dot(collisionPlane, v2);
 
-							// Calculate the scaler velocities of each object after the collision.
+							// Calculate the scalar velocities of each object after the collision.
 							float n_vel1_after = ((n_vel1 * (mass[one] - mass[two])) + (2 * mass[two] * n_vel2)) / (totMass);
 							float n_vel2_after = ((n_vel2 * (mass[two] - mass[one])) + (2 * mass[one] * n_vel1)) / (totMass);
 							float velObject1Tangent_After = c_vel1;
 							float velObject2Tangent_After = c_vel2;
 
-							// Convert the scalers to vectors by multiplying by the normalised plane vectors.
+							// Convert the scalars to vectors by multiplying by the normalised plane vectors.
 							vec2 vec_n_vel2_after = n_vel2_after * normalPlane;
 							vec2 vec_c_vel2 = c_vel2 * collisionPlane;
 							vec2 vec_n_vel1_after = n_vel1_after * normalPlane;
@@ -560,7 +565,7 @@ int main( int argc, char **argv )
 			}while(collision == true);
 		}
 
-		//draw the ballz
+		//draw the ballz -> since all balls, collided or not, have accurate values. 
 		for(int index = 0; index < n_ballz; index++){
 			int i = 189*index;
 			float ang = 0.0f;
@@ -568,7 +573,8 @@ int main( int argc, char **argv )
 			float pi2 = 3.1f;
 
 			//cout << index << " x: " << xVel[index]  << " y: " << yPosition[index] << endl;
-      
+      		
+      		//draw each ball: consist of vertices calculated with sin and cos.
 			do{
 				ballz[i] = radius[index]*cos(ang) + xPosition[index];
 				i++;
@@ -588,6 +594,7 @@ int main( int argc, char **argv )
 			preyVel[g] = yVel[g];
 		}
 
+		//bind the buffers for the balls: vertices and the colors
 		glGenBuffers(1, &ballzbuffer); 
 		glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer); 
 		glBufferData(GL_ARRAY_BUFFER, sizeof(ballz), ballz, GL_STATIC_DRAW);
@@ -602,6 +609,7 @@ int main( int argc, char **argv )
 		glViewport(0, 0, width, height);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		//buffers for the walls and ground
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 		glVertexAttribPointer(
@@ -613,10 +621,10 @@ int main( int argc, char **argv )
 								(void*)0            // array buffer offset
 								);
 
-		// Draw the triangle !
+		// Draw the walls
 		glDrawArrays(GL_TRIANGLES, 0, 3*6); // 3 indices starting at 0 -> 1 triangle
 
-		//for the rope
+		//buffers for the rope
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, ropebuffer);
 		glVertexAttribPointer(
@@ -630,10 +638,12 @@ int main( int argc, char **argv )
     
 
 		//glVertexPointer(2, GL_FLOAT, 0, ropez);
+		//draw the ropes
 		glDrawArrays(GL_LINES, 0, 2*n_ballz);
+		//activate attribute(1):colors
 		glEnableVertexAttribArray(1); 
     
-		//for them baallz
+		//bind the balls
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, ballzbuffer);
 		glVertexAttribPointer(
@@ -644,7 +654,7 @@ int main( int argc, char **argv )
 								0,                  // stride
 								(void*)0            // array buffer offset
 								);
-
+		//bind the colors: attrib(1)
 		glBindBuffer(GL_ARRAY_BUFFER, colorBallBuffer); 
 		glVertexAttribPointer(
 								1,                  // attribute 1. No particular reason for 0, but must match the layout in the shader.
@@ -655,12 +665,12 @@ int main( int argc, char **argv )
 								(void*)0            // array buffer offset
 								);
 
-		// Draw the triangle !
+		// Draw the balls!
 		for(int w = 0; w < n_ballz; w++)
 			glDrawArrays(GL_TRIANGLE_FAN, w*63, 63); // 3 indices starting at 0 -> 1 triangle
 	
 
-		//Disable
+		//Disable attributes
 		glDisableVertexAttribArray(1); 
 		glDisableVertexAttribArray(0);
 			
