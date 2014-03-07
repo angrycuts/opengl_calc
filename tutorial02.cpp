@@ -654,7 +654,7 @@ int main( int argc, char **argv )
 								0,                  // stride
 								(void*)0            // array buffer offset
 								);
-		//bind the colors: attrib(1)
+		//bind the colors: attribute(1)->add color to the object
 		glBindBuffer(GL_ARRAY_BUFFER, colorBallBuffer); 
 		glVertexAttribPointer(
 								1,                  // attribute 1. No particular reason for 0, but must match the layout in the shader.
