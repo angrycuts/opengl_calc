@@ -466,23 +466,18 @@ int main( int argc, char **argv )
 							
 							//move the ball from the previous values: along the normal plane until they are adjacents
 							float move = 0.001;
+
+							//calc
+							vec2 posOne = vec2(xPosition[one], yPosition[one]);
+							vec2 posTwo = vec2(xPosition[two], yPosition[two]);
+							vec2 norm = posOne - posTwo;
+							vec2 normalPlane = normalize(norm);
+
 							while(sqrtf(pow(xPosition[one]-xPosition[two], 2) + pow(yPosition[one]-yPosition[two], 2)) < radius[one] + radius[two])
 							{			
 									
 								float tempXPos[] = {xPosition[one], xPosition[two]}; 
 								float tempYPos[] = {yPosition[one], yPosition[two]}; 
-								/*
-								xPosition[one] = xPosition[one] - (move * cos(angleOne));
-								yPosition[one] = yPosition[one] - (move * sin(angleOne));
-
-								xPosition[two] = xPosition[two] - (move * cos(angleTwo));
-								yPosition[two] = yPosition[two] - (move * sin(angleTwo));*/	
-
-								//calc
-								vec2 posOne = vec2(xPosition[one], yPosition[one]);
-								vec2 posTwo = vec2(xPosition[two], yPosition[two]);
-								vec2 norm = posOne - posTwo;
-								vec2 normalPlane = normalize(norm);
 								
 								if(xPosition[one] < xPosition[two]){
 									posOne -= move*normalPlane;
@@ -523,11 +518,11 @@ int main( int argc, char **argv )
 							}
 								
 							float totMass = mass[one]+mass[two];
-							vec2 posOne = vec2(xPosition[one], yPosition[one]);
-							vec2 posTwo = vec2(xPosition[two], yPosition[two]);
-							vec2 norm = posOne - posTwo;
+							posOne = vec2(xPosition[one], yPosition[one]);
+							posTwo = vec2(xPosition[two], yPosition[two]);
+							norm = posOne - posTwo;
 
-							vec2 normalPlane = normalize(norm);
+							normalPlane = normalize(norm);
 							vec2 collisionPlane = vec2(-normalPlane[1], normalPlane[0]);
 
 							//Calculate prior velocities relative the the collision plane and normal
